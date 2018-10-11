@@ -19,6 +19,6 @@ public class DataBaseLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-     //   this.listEntryRepository.save(new ListEntry("Test", "String"));
+        this.listEntryRepository.save(new ListEntry("Test", false));
     }
 }

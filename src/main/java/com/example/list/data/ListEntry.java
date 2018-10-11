@@ -21,13 +21,13 @@ public class ListEntry implements Serializable {
     @Id
     @GeneratedValue(strategy= GenerationType.AUTO)
     private Long id;
-    private String name;
-    private String check;
+    private String listItem;
+    private boolean isFulfilled;
 
     private ListEntry() {}
 
-    public ListEntry(String name, String check) {
-        this.name = name;
-        this.check = check;
+    public ListEntry(String listItem, boolean isFulfilled) {
+        this.listItem = listItem;
+        this.isFulfilled = isFulfilled;
     }
 }
