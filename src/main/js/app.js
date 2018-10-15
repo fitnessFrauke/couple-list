@@ -10,7 +10,7 @@ class App extends React.Component {
     }
 
     componentDidMount() {
-        client({method: 'GET', path: '/api/listEntry'}).done(response => {
+        client({method: 'GET', path: '/api/listEntries'}).done(response => {
             this.setState({listEntry: response.entity._embedded.listEntry});
     });
     }
@@ -24,6 +24,7 @@ class App extends React.Component {
 
 class ListEntries extends React.Component{
     render() {
+        console.log(this.props);
         const listEntry = this.props.listEntry.map(listEntry =>
             <listEntry key={listEntry._links.self.href} employee={listEntry}/>
         );

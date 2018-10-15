@@ -1,4 +1,6 @@
 var path = require('path');
+var webpack = require('webpack');
+var packageJSON = require('./package.json');
 
 module.exports = {
     entry: './src/main/js/app.js',

@@ -26694,6 +26694,72 @@ var __WEBPACK_AMD_DEFINE_RESULT__;/** @license MIT License (c) copyright 2010-20
 
 /***/ }),
 
+/***/ "./src/main/js/api/uriListConverter.js":
+/*!*********************************************!*\
+  !*** ./src/main/js/api/uriListConverter.js ***!
+  \*********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_RESULT__ = (function () {
+  'use strict';
+  /* Convert a single or array of resources into "URI1\nURI2\nURI3..." */
+
+  return {
+    read: function read(str
+    /*, opts */
+    ) {
+      return str.split('\n');
+    },
+    write: function write(obj
+    /*, opts */
+    ) {
+      // If this is an Array, extract the self URI and then join using a newline
+      if (obj instanceof Array) {
+        return obj.map(function (resource) {
+          return resource._links.self.href;
+        }).join('\n');
+      } else {
+        // otherwise, just return the self URI
+        return obj._links.self.href;
+      }
+    }
+  };
+}).call(exports, __webpack_require__, exports, module),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+
+/***/ }),
+
+/***/ "./src/main/js/api/uriTemplateInterceptor.js":
+/*!***************************************************!*\
+  !*** ./src/main/js/api/uriTemplateInterceptor.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_RESULT__ = (function (require) {
+  'use strict';
+
+  var interceptor = __webpack_require__(/*! rest/interceptor */ "./node_modules/rest/interceptor.js");
+
+  return interceptor({
+    request: function request(_request
+    /*, config, meta */
+    ) {
+      /* If the URI is a URI Template per RFC 6570 (http://tools.ietf.org/html/rfc6570), trim out the template part */
+      if (_request.path.indexOf('{') === -1) {
+        return _request;
+      } else {
+        _request.path = _request.path.split('{')[0];
+        return _request;
+      }
+    }
+  });
+}).call(exports, __webpack_require__, exports, module),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+
+/***/ }),
+
 /***/ "./src/main/js/app.js":
 /*!****************************!*\
   !*** ./src/main/js/app.js ***!
@@ -26749,7 +26815,7 @@ function (_React$Component) {
 
       client({
         method: 'GET',
-        path: '/api/listEntry'
+        path: '/api/listEntries'
       }).done(function (response) {
         _this2.setState({
           listEntry: response.entity._embedded.listEntry
@@ -26836,14 +26902,14 @@ var defaultRequest = __webpack_require__(/*! rest/interceptor/defaultRequest */ 
 
 var mime = __webpack_require__(/*! rest/interceptor/mime */ "./node_modules/rest/interceptor/mime.js");
 
-var uriTemplateInterceptor = __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module './api/uriTemplateInterceptor'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()));
+var uriTemplateInterceptor = __webpack_require__(/*! ./api/uriTemplateInterceptor */ "./src/main/js/api/uriTemplateInterceptor.js");
 
 var errorCode = __webpack_require__(/*! rest/interceptor/errorCode */ "./node_modules/rest/interceptor/errorCode.js");
 
 var baseRegistry = __webpack_require__(/*! rest/mime/registry */ "./node_modules/rest/mime/registry.js");
 
 var registry = baseRegistry.child();
-registry.register('text/uri-list', __webpack_require__(!(function webpackMissingModule() { var e = new Error("Cannot find module './api/uriListConverter'"); e.code = 'MODULE_NOT_FOUND'; throw e; }())));
+registry.register('text/uri-list', __webpack_require__(/*! ./api/uriListConverter */ "./src/main/js/api/uriListConverter.js"));
 registry.register('application/hal+json', __webpack_require__(/*! rest/mime/type/application/hal */ "./node_modules/rest/mime/type/application/hal.js"));
 module.exports = rest.wrap(mime, {
   registry: registry
