@@ -6,27 +6,26 @@ class App extends React.Component {
 
     constructor(props) {
         super(props);
-        this.state = {listEntry: []};
+        this.state = {listEntries: []};
     }
 
     componentDidMount() {
         client({method: 'GET', path: '/api/listEntries'}).done(response => {
-            this.setState({listEntry: response.entity._embedded.listEntry});
+            this.setState({listEntries: response.entity._embedded.listEntries});
     });
     }
 
     render() {
         return (
-            <ListEntries listEntry={this.state.listEntry}/>
+            <EntryList listEntries={this.state.listEntries}/>
     )
     }
 }
 
-class ListEntries extends React.Component{
+class EntryList extends React.Component{
     render() {
-        console.log(this.props);
-        const listEntry = this.props.listEntry.map(listEntry =>
-            <listEntry key={listEntry._links.self.href} employee={listEntry}/>
+        const listEntries = this.props.listEntries.map(listEntry =>
+            <ListEntry key={listEntry._links.self.href} listEntry={listEntry}/>
         );
         return (
             <table>
@@ -35,7 +34,7 @@ class ListEntries extends React.Component{
                     <th>What to do</th>
                     <th>is fulfilled</th>
                 </tr>
-                {listEntry}
+                {listEntries}
                 </tbody>
             </table>
         )
@@ -44,10 +43,11 @@ class ListEntries extends React.Component{
 
 class ListEntry extends React.Component{
     render() {
+        console.log(this.props.listEntry.fulfilled);
         return (
             <tr>
                 <td>{this.props.listEntry.listItem}</td>
-                <td>{this.props.listEntry.isFulfilled}</td>
+                <td>{this.props.listEntry.fulfilled.toString()}</td>
             </tr>
         )
     }

@@ -19,6 +19,7 @@ public class DataBaseLoader implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        this.listEntryRepository.deleteAll();
         this.listEntryRepository.save(new ListEntry("Test", false));
         this.listEntryRepository.save(new ListEntry("Test1", false));
         this.listEntryRepository.save(new ListEntry("Test2", false));
