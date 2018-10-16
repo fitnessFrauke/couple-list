@@ -1,6 +1,10 @@
+'use strict'
+
 const React = require('react');
 const ReactDOM = require('react-dom');
 const client = require('./client');
+const follow = require('./follow');
+const root = '/api';
 
 class App extends React.Component {
 
@@ -10,19 +14,38 @@ class App extends React.Component {
     }
 
     componentDidMount() {
-        client({method: 'GET', path: '/api/listEntries'}).done(response => {
-            this.setState({listEntries: response.entity._embedded.listEntries});
-    });
+        this.loadFromServer(this.state.pageSize);
+    }
+
+    loadFromServer(pageSize) {
+        follow(client, root, [
+            {rel: 'listEntries', params: {size: pageSize}}
+        ]).then(listEntries => {
+            return client({
+                method: 'GET',
+                path: listEntries.entity._links.profile.href,
+                headers: {'Accept': 'application/schema+json'}
+            }).then(schema => {
+                this.schema = schema.entity;
+                return listEntries;
+            });
+        }).done(listEntries => {
+            this.setState({
+                listEntries: listEntries.entity._embedded.listEntries,
+                attributes: Object.keys(this.schema.properties),
+                pageSize: pageSize,
+                links: listEntries.entity._links});
+        })
     }
 
     render() {
         return (
             <EntryList listEntries={this.state.listEntries}/>
-    )
+        )
     }
 }
 
-class EntryList extends React.Component{
+class EntryList extends React.Component {
     render() {
         const listEntries = this.props.listEntries.map(listEntry =>
             <ListEntry key={listEntry._links.self.href} listEntry={listEntry}/>
@@ -41,9 +64,8 @@ class EntryList extends React.Component{
     }
 }
 
-class ListEntry extends React.Component{
+class ListEntry extends React.Component {
     render() {
-        console.log(this.props.listEntry.fulfilled);
         return (
             <tr>
                 <td>{this.props.listEntry.listItem}</td>
@@ -54,6 +76,6 @@ class ListEntry extends React.Component{
 }
 
 ReactDOM.render(
-    <App />,
+    <App/>,
     document.getElementById('react')
 );

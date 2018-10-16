@@ -23,3 +23,7 @@
 /dist/
 /nbdist/
 /.nb-gradle/
+
+
+src/main/resources/static/built/bundle.js
+src/main/resources/static/built/bundle.js.map

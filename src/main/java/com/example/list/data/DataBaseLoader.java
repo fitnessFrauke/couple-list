@@ -4,6 +4,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * @author Frauke Trautmann
  */
@@ -20,10 +23,14 @@ public class DataBaseLoader implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         this.listEntryRepository.deleteAll();
-        this.listEntryRepository.save(new ListEntry("Test", false));
-        this.listEntryRepository.save(new ListEntry("Test1", false));
-        this.listEntryRepository.save(new ListEntry("Test2", false));
-        this.listEntryRepository.save(new ListEntry("Test3", false));
-        this.listEntryRepository.save(new ListEntry("Test4", false));
+        this.listEntryRepository.saveAll(getDemoData());
+    }
+
+    private List<ListEntry> getDemoData (){
+        List<ListEntry> demoData = new ArrayList<>();
+        for(int var = 0; var <= 4; var++) {
+            demoData.add(new ListEntry("Test"+ var, false));
+        }
+        return demoData;
     }
 }
