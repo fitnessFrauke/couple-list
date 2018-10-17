@@ -67,7 +67,7 @@ class App extends React.Component {
     onNavigate(navUri) {
         client({method: 'GET', path: navUri}).done(listEntries => {
             this.setState({
-                listEntry: listEntries.entity._embedded.listEntries,
+                listEntries: listEntries.entity._embedded.listEntries,
                 attributes: this.state.attributes,
                 pageSize: this.state.pageSize,
                 links: listEntries.entity._links
@@ -83,7 +83,11 @@ class App extends React.Component {
 
     render() {
         return (
-            <EntryList listEntries={this.state.listEntries}/>
+            <EntryList listEntries={this.state.listEntries}
+            links={this.state.links}
+            pageSize={this.state.pageSize}
+            onNavigate={this.onNavigate}
+            updatePageSize={this.updatePageSize}/>
         )
     }
 }
