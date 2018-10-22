@@ -13,7 +13,7 @@ class App extends React.Component {
         this.state = {listEntries: [], attributes: [], pageSize: 5, links: {}};
         this.updatePageSize = this.updatePageSize.bind(this);
         this.onCreate = this.onCreate.bind(this);
-       // this.onDelete = this.onDelete.bind(this);
+        // this.onDelete = this.onDelete.bind(this);
         this.onNavigate = this.onNavigate.bind(this);
     }
 
@@ -76,29 +76,49 @@ class App extends React.Component {
     }
 
     updatePageSize(pageSize) {
-        if(pageSize !== this.state.pageSize) {
+        if (pageSize !== this.state.pageSize) {
             this.loadFromServer(pageSize);
         }
     }
 
     render() {
         return (
-            <EntryList listEntries={this.state.listEntries}
-            links={this.state.links}
-            pageSize={this.state.pageSize}
-            onNavigate={this.onNavigate}
-            updatePageSize={this.updatePageSize}/>
+            <div>
+                <CreateDialog attributes={this.state.attributes} onCreate={this.onCreate}/>
+                <EntryList listEntries={this.state.listEntries}
+                           links={this.state.links}
+                           pageSize={this.state.pageSize}
+                           onNavigate={this.onNavigate}
+                           updatePageSize={this.updatePageSize}/>
+            </div>
         )
     }
 }
 
 class EntryList extends React.Component {
+    handleInput(e) {
+        e.preventDefault();
+        const pageSize = ReactDOM.findDOMNode(this.refs.pageSize).value;
+        if (/^[0-9]+$/.test(pageSize)) {
+            this.props.updatePageSize(pageSize);
+        } else {
+            ReactDOM.findDOMNode(this.refs.pageSize).value =
+                pageSize.substring(0, pageSize.length - 1);
+        }
+    }
+
+    onDelete(listEntry) {
+        client({method: 'DELETE', path: listEntry._links.self.href}).done(response => {
+            this.loadFromServer(this.state.pageSize);
+        })
+    }
+
     render() {
         const listEntries = this.props.listEntries.map(listEntry =>
-            <ListEntry key={listEntry._links.self.href} listEntry={listEntry}/>
+            <ListEntry key={listEntry._links.self.href} listEntry={listEntry} onDelete={this.props.onDelete}/>
         );
         const navLinks = [];
-      //  console.log(this.props);
+        //  console.log(this.props);
         if ("first" in this.props.links) {
             navLinks.push(<button key="first" onClick={this.handleNavFirst}>&lt;&lt;</button>);
         }
@@ -132,11 +152,24 @@ class EntryList extends React.Component {
 }
 
 class ListEntry extends React.Component {
+
+    constructor(props) {
+        super(props);
+        this.handleDelete = this.handleDelete.bind(this);
+    }
+
+    handleDelete() {
+        this.props.onDelete(this.props.listEntry)
+    }
+
     render() {
         return (
             <tr>
                 <td>{this.props.listEntry.listItem}</td>
                 <td>{this.props.listEntry.fulfilled.toString()}</td>
+                <td>
+                    <button onClick={this.handleDelete}>Delete</button>
+                </td>
             </tr>
         )
     }
@@ -148,7 +181,7 @@ class CreateDialog extends React.Component {
         this.handleSubmit = this.handleSubmit.bind(this);
     }
 
-    handelSubmit(e) {
+    handleSubmit(e) {
         e.preventDefault();
         const newListEntry = {};
         this.props.attributes.forEach(attribute => {
@@ -163,28 +196,36 @@ class CreateDialog extends React.Component {
         window.location = "#";
     }
 
-    render() {
-        const inputs = this.props.attributes.map(attribute =>
-            <p key={attribute}>
-                <input type="text" placeholder={attribute} ref={attribute} className="field"/>
-            </p>
-        );
+    onCreate(newListEntry) {
+        follow(client, root, ['listEntry']).then(listEntries => {
+            return client({
+                method: 'POST',
+                path: listEntries.entity._links.self.href,
+                entity: newListEntry,
+                headers: {'Content-Type': 'application/json'}
+            })
+        }).then(response => {
+            return follow(client, root, [
+                {rel: 'listEntries', params: {'size': this.state.pageSize}}
+            ]);
+        }).done(response => {
+            if (typeof response.entity._links.last !== "undefined") {
+                this.onNavigation(response.entity._links.last.href);
+            } else {
+                this.onNavigation(response.entity._links.self.href);
+            }
+        })
+    }
 
-        return <div>
-            <a href="createListEntry">Create</a>
-
-            <div id="createListEntry" className="modalDialog">
-                <div>
-                    <a href="#" title="Close" className="close">X</a>
-                    <h2>Create new list entry</h2>
-
-                    <form>
-                        {inputs}
-                        <button onClick={this.handleSubmit}>Create</button>
-                    </form>
-                </div>
-            </div>
-        </div>
+    onNavigation(navUri) {
+        client({method: 'GET', path: navUri}).done(listEntries => {
+            this.setState({
+                listEntries: listEntries.entity._embedded.listEntries,
+                attributes: this.state.attributes,
+                pageSize: this.state.pageSize,
+                links: listEntries.entity._links
+            });
+        });
     }
 
     handleNavFirst(e) {
@@ -205,6 +246,30 @@ class CreateDialog extends React.Component {
     handleNavLast(e) {
         e.preventDefault();
         this.props.onNavigate(this.props.links.last.href);
+    }
+
+    render() {
+        const inputs = this.props.attributes.map(attribute =>
+            <p key={attribute}>
+                <input type="text" placeholder={attribute} ref={attribute} className="field"/>
+            </p>
+        );
+
+        return <div>
+            <a href="#createListEntry">Create</a>
+
+            <div id="createListEntry" className="modalDialog">
+                <div>
+                    <a href="#" title="Close" className="close">X</a>
+                    <h2>Create new list entry</h2>
+
+                    <form>
+                        {inputs}
+                        <button onClick={this.handleSubmit}>Create</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     }
 }
 
