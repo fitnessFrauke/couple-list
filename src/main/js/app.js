@@ -98,7 +98,7 @@ class EntryList extends React.Component {
             <ListEntry key={listEntry._links.self.href} listEntry={listEntry}/>
         );
         const navLinks = [];
-        console.log(this.props);
+      //  console.log(this.props);
         if ("first" in this.props.links) {
             navLinks.push(<button key="first" onClick={this.handleNavFirst}>&lt;&lt;</button>);
         }
