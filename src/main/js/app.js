@@ -96,6 +96,16 @@ class App extends React.Component {
 }
 
 class EntryList extends React.Component {
+
+    constructor(props){
+        super(props);
+        this.handleNavFirst = this.handleNavFirst.bind(this);
+        this.handleNavPrev = this.handleNavPrev.bind(this);
+        this.handleNavNext = this.handleNavNext.bind(this);
+        this.handleNavLast = this.handleNavLast.bind(this);
+        this.handleInput = this.handleInput.bind(this);
+    }
+
     handleInput(e) {
         e.preventDefault();
         const pageSize = ReactDOM.findDOMNode(this.refs.pageSize).value;
@@ -111,6 +121,26 @@ class EntryList extends React.Component {
         client({method: 'DELETE', path: listEntry._links.self.href}).done(response => {
             this.loadFromServer(this.state.pageSize);
         })
+    }
+
+    handleNavFirst(e){
+        e.preventDefault();
+        this.props.onNavigate(this.props.links.first.href);
+    }
+
+    handleNavPrev(e) {
+        e.preventDefault();
+        this.props.onNavigate(this.props.links.prev.href);
+    }
+
+    handleNavNext(e) {
+        e.preventDefault();
+        this.props.onNavigate(this.props.links.next.href);
+    }
+
+    handleNavLast(e) {
+        e.preventDefault();
+        this.props.onNavigate(this.props.links.last.href);
     }
 
     render() {
