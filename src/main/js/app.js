@@ -13,7 +13,7 @@ class App extends React.Component {
         this.state = {listEntries: [], attributes: [], pageSize: 5, links: {}};
         this.updatePageSize = this.updatePageSize.bind(this);
         this.onCreate = this.onCreate.bind(this);
-        // this.onDelete = this.onDelete.bind(this);
+        this.onDelete = this.onDelete.bind(this);
         this.onNavigate = this.onNavigate.bind(this);
     }
 
@@ -44,7 +44,7 @@ class App extends React.Component {
     }
 
     onCreate(newListEntry) {
-        follow(client, root, ['listEntry']).then(listEntries => {
+        follow(client, root, ['listEntries']).then(listEntries => {
             return client({
                 method: 'POST',
                 path: listEntries.entity._links.self.href,
@@ -53,7 +53,7 @@ class App extends React.Component {
             })
         }).then(response => {
             return follow(client, root, [
-                {rel: 'listEntry', params: {'size': this.state.pageSize}}
+                {rel: 'listEntries', params: {'size': this.state.pageSize}}
             ]);
         }).done(response => {
             if (typeof response.entity._links.last !== "undefined") {
@@ -61,6 +61,12 @@ class App extends React.Component {
             } else {
                 this.onNavigate(response.entity._links.self.href);
             }
+        })
+    }
+
+    onDelete(listEntry) {
+        client({method: 'DELETE', path: listEntry._links.self.href}).done(response => {
+            this.loadFromServer(this.state.pageSize);
         })
     }
 
@@ -115,12 +121,6 @@ class EntryList extends React.Component {
             ReactDOM.findDOMNode(this.refs.pageSize).value =
                 pageSize.substring(0, pageSize.length - 1);
         }
-    }
-
-    onDelete(listEntry) {
-        client({method: 'DELETE', path: listEntry._links.self.href}).done(response => {
-            this.loadFromServer(this.state.pageSize);
-        })
     }
 
     handleNavFirst(e){
