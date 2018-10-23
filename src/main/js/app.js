@@ -14,6 +14,7 @@ class App extends React.Component {
         this.updatePageSize = this.updatePageSize.bind(this);
         this.onCreate = this.onCreate.bind(this);
         this.onDelete = this.onDelete.bind(this);
+        this.onUpdate = this.onUpdate.bind(this);
         this.onNavigate = this.onNavigate.bind(this);
     }
 
@@ -70,6 +71,25 @@ class App extends React.Component {
         })
     }
 
+    onUpdate(listEntry, updatedListEntry) {
+        client({
+            method: 'PUT',
+            path: listEntry.entity._links.self.href,
+            entity: updatedListEntry,
+            headers: {
+                'Content-Type': 'application/json',
+                'If-Match': listEntry.headers.Etag
+            }
+        }).done(response => {
+            this.loadFromServer(this.state.pageSize);
+        }, response => {
+            if (response.status.code === 412) {
+                alert('Denied: Unable to update'
+                    + listEntry.entity._links.self.href + '. Your copy is stale.');
+            }
+        });
+    }
+
     onNavigate(navUri) {
         client({method: 'GET', path: navUri}).done(listEntries => {
             this.setState({
@@ -95,6 +115,7 @@ class App extends React.Component {
                            links={this.state.links}
                            pageSize={this.state.pageSize}
                            onNavigate={this.onNavigate}
+                           onDelete={this.onDelete}
                            updatePageSize={this.updatePageSize}/>
             </div>
         )
@@ -103,7 +124,7 @@ class App extends React.Component {
 
 class EntryList extends React.Component {
 
-    constructor(props){
+    constructor(props) {
         super(props);
         this.handleNavFirst = this.handleNavFirst.bind(this);
         this.handleNavPrev = this.handleNavPrev.bind(this);
@@ -123,7 +144,7 @@ class EntryList extends React.Component {
         }
     }
 
-    handleNavFirst(e){
+    handleNavFirst(e) {
         e.preventDefault();
         this.props.onNavigate(this.props.links.first.href);
     }
@@ -197,6 +218,11 @@ class ListEntry extends React.Component {
             <tr>
                 <td>{this.props.listEntry.listItem}</td>
                 <td>{this.props.listEntry.fulfilled.toString()}</td>
+                <td>
+                    <UpdateDialog listEntry={this.props.listEntry}
+                                  attributes={this.props.attributes}
+                                  onUpdate={this.props.onUpdate}/>
+                </td>
                 <td>
                     <button onClick={this.handleDelete}>Delete</button>
                 </td>
@@ -300,6 +326,53 @@ class CreateDialog extends React.Component {
                 </div>
             </div>
         </div>
+    }
+}
+
+class UpdateDialog extends React.Component {
+
+    constructor(props) {
+        super(props);
+        this.handleSubmit = this.handleSubmit.bind(this);
+    }
+
+    handleSubmit(e) {
+        e.preventDefault();
+        const updateListEntry = {};
+        this.props.attributes.forEach(attribute => {
+            updateListEntry[attribute] = ReactDOM.findDOMNode(this.refs[attribute]).value.trim();
+        });
+        this.props.onUpdate(this.props.listEntry, updateListEntry);
+        window.location = "#";
+    }
+
+    render() {
+        const inputs = this.props.attributes.map(attribute =>
+            <p key={this.props.listEntry.entity[attribute]}>
+                <input type="text" placeholder={attribute}
+                       defaultValue={this.props.listEntry.entity[attribute]}
+                       ref={attribute} className="field"/>
+            </p>
+        );
+
+        const dialogId = "updateListEntry-" + this.props.listEntry.entity._links.self.href;
+
+        return (
+            <div key={this.props.listEntry.entity._links.self.href}>
+                <a href={"#" + dialogId}> Update </a>
+                <div id={dialogId} className="modalDialog">
+                    <div>
+                        <a href="#" title="Close" className="close">X</a>
+
+                        <h2>Update an employee</h2>
+                        <form>
+                            {inputs}
+                            <button onClick={this.handleSubmit}> Update </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        )
     }
 }
 
