@@ -66,7 +66,7 @@ class App extends React.Component {
     }
 
     onDelete(listEntry) {
-        client({method: 'DELETE', path: listEntry._links.self.href}).done(response => {
+        client({method: 'DELETE', path: listEntry.entity._links.self.href}).done(response => {
             this.loadFromServer(this.state.pageSize);
         })
     }
@@ -116,7 +116,9 @@ class App extends React.Component {
                            pageSize={this.state.pageSize}
                            onNavigate={this.onNavigate}
                            onDelete={this.onDelete}
-                           updatePageSize={this.updatePageSize}/>
+                           onUpdate={this.onUpdate}
+                           updatePageSize={this.updatePageSize}
+                           attributes={this.state.attributes}/>
             </div>
         )
     }
@@ -166,7 +168,11 @@ class EntryList extends React.Component {
 
     render() {
         const listEntries = this.props.listEntries.map(listEntry =>
-            <ListEntry key={listEntry._links.self.href} listEntry={listEntry} onDelete={this.props.onDelete}/>
+            <ListEntry key={listEntry.entity._links.self.href}
+                       listEntry={listEntry}
+                       attributes={this.props.attributes}
+                       onDelete={this.props.onDelete}
+                       onUpdate={this.props.onUpdate}/>
         );
         const navLinks = [];
         //  console.log(this.props);
@@ -216,8 +222,8 @@ class ListEntry extends React.Component {
     render() {
         return (
             <tr>
-                <td>{this.props.listEntry.listItem}</td>
-                <td>{this.props.listEntry.fulfilled.toString()}</td>
+                <td>{this.props.listEntry.entity.listItem}</td>
+                <td>{this.props.listEntry.entity.fulfilled.toString()}</td>
                 <td>
                     <UpdateDialog listEntry={this.props.listEntry}
                                   attributes={this.props.attributes}
@@ -232,6 +238,7 @@ class ListEntry extends React.Component {
 }
 
 class CreateDialog extends React.Component {
+
     constructor(props) {
         super(props);
         this.handleSubmit = this.handleSubmit.bind(this);
@@ -344,6 +351,25 @@ class UpdateDialog extends React.Component {
         });
         this.props.onUpdate(this.props.listEntry, updateListEntry);
         window.location = "#";
+    }
+
+    onUpdate(listEntry, updatedListEntry) {
+        client({
+            method: 'PUT',
+            path: listEntry.entity._links.self.href,
+            entity: updatedListEntry,
+            headers: {
+                'Content-Type': 'application/json',
+                'If-Match': listEntry.headers.Etag
+            }
+        }).done(response => {
+            this.loadFromServer(this.state.pageSize);
+        }, response => {
+            if (response.status.code === 412) {
+                alert('Denied: Unable to update'
+                    + listEntry.entity._links.self.href + '. Your copy is stale.');
+            }
+        });
     }
 
     render() {

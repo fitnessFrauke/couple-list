@@ -26767,6 +26767,9 @@ var __WEBPACK_AMD_DEFINE_RESULT__;!(__WEBPACK_AMD_DEFINE_RESULT__ = (function (r
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
+"use strict";
+
+
 function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -26777,19 +26780,23 @@ function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _d
 
 function _possibleConstructorReturn(self, call) { if (call && (_typeof(call) === "object" || typeof call === "function")) { return call; } return _assertThisInitialized(self); }
 
-function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
-
 function _getPrototypeOf(o) { _getPrototypeOf = Object.setPrototypeOf ? Object.getPrototypeOf : function _getPrototypeOf(o) { return o.__proto__ || Object.getPrototypeOf(o); }; return _getPrototypeOf(o); }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function"); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, writable: true, configurable: true } }); if (superClass) _setPrototypeOf(subClass, superClass); }
 
 function _setPrototypeOf(o, p) { _setPrototypeOf = Object.setPrototypeOf || function _setPrototypeOf(o, p) { o.__proto__ = p; return o; }; return _setPrototypeOf(o, p); }
 
+function _assertThisInitialized(self) { if (self === void 0) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return self; }
+
 var React = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 
 var ReactDOM = __webpack_require__(/*! react-dom */ "./node_modules/react-dom/index.js");
 
 var client = __webpack_require__(/*! ./client */ "./src/main/js/client.js");
+
+var follow = __webpack_require__(/*! ./follow */ "./src/main/js/follow.js");
+
+var root = '/api';
 
 var App =
 /*#__PURE__*/
@@ -26803,62 +26810,270 @@ function (_React$Component) {
 
     _this = _possibleConstructorReturn(this, _getPrototypeOf(App).call(this, props));
     _this.state = {
-      listEntry: []
+      listEntries: [],
+      attributes: [],
+      pageSize: 5,
+      links: {}
     };
+    _this.updatePageSize = _this.updatePageSize.bind(_assertThisInitialized(_assertThisInitialized(_this)));
+    _this.onCreate = _this.onCreate.bind(_assertThisInitialized(_assertThisInitialized(_this)));
+    _this.onDelete = _this.onDelete.bind(_assertThisInitialized(_assertThisInitialized(_this)));
+    _this.onUpdate = _this.onUpdate.bind(_assertThisInitialized(_assertThisInitialized(_this)));
+    _this.onNavigate = _this.onNavigate.bind(_assertThisInitialized(_assertThisInitialized(_this)));
     return _this;
   }
 
   _createClass(App, [{
     key: "componentDidMount",
     value: function componentDidMount() {
+      this.loadFromServer(this.state.pageSize);
+    }
+  }, {
+    key: "loadFromServer",
+    value: function loadFromServer(pageSize) {
       var _this2 = this;
 
-      client({
-        method: 'GET',
-        path: '/api/listEntries'
-      }).done(function (response) {
+      follow(client, root, [{
+        rel: 'listEntries',
+        params: {
+          size: pageSize
+        }
+      }]).then(function (listEntries) {
+        return client({
+          method: 'GET',
+          path: listEntries.entity._links.profile.href,
+          headers: {
+            'Accept': 'application/schema+json'
+          }
+        }).then(function (schema) {
+          _this2.schema = schema.entity;
+          return listEntries;
+        });
+      }).done(function (listEntries) {
         _this2.setState({
-          listEntry: response.entity._embedded.listEntry
+          listEntries: listEntries.entity._embedded.listEntries,
+          attributes: Object.keys(_this2.schema.properties),
+          pageSize: pageSize,
+          links: listEntries.entity._links
         });
       });
     }
   }, {
+    key: "onCreate",
+    value: function onCreate(newListEntry) {
+      var _this3 = this;
+
+      follow(client, root, ['listEntries']).then(function (listEntries) {
+        return client({
+          method: 'POST',
+          path: listEntries.entity._links.self.href,
+          entity: newListEntry,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }).then(function (response) {
+        return follow(client, root, [{
+          rel: 'listEntries',
+          params: {
+            'size': _this3.state.pageSize
+          }
+        }]);
+      }).done(function (response) {
+        if (typeof response.entity._links.last !== "undefined") {
+          _this3.onNavigate(response.entity._links.last.href);
+        } else {
+          _this3.onNavigate(response.entity._links.self.href);
+        }
+      });
+    }
+  }, {
+    key: "onDelete",
+    value: function onDelete(listEntry) {
+      var _this4 = this;
+
+      client({
+        method: 'DELETE',
+        path: listEntry._links.self.href
+      }).done(function (response) {
+        _this4.loadFromServer(_this4.state.pageSize);
+      });
+    }
+  }, {
+    key: "onUpdate",
+    value: function onUpdate(listEntry, updatedListEntry) {
+      var _this5 = this;
+
+      client({
+        method: 'PUT',
+        path: listEntry.entity._links.self.href,
+        entity: updatedListEntry,
+        headers: {
+          'Content-Type': 'application/json',
+          'If-Match': listEntry.headers.Etag
+        }
+      }).done(function (response) {
+        _this5.loadFromServer(_this5.state.pageSize);
+      }, function (response) {
+        if (response.status.code === 412) {
+          alert('Denied: Unable to update' + listEntry.entity._links.self.href + '. Your copy is stale.');
+        }
+      });
+    }
+  }, {
+    key: "onNavigate",
+    value: function onNavigate(navUri) {
+      var _this6 = this;
+
+      client({
+        method: 'GET',
+        path: navUri
+      }).done(function (listEntries) {
+        _this6.setState({
+          listEntries: listEntries.entity._embedded.listEntries,
+          attributes: _this6.state.attributes,
+          pageSize: _this6.state.pageSize,
+          links: listEntries.entity._links
+        });
+      });
+    }
+  }, {
+    key: "updatePageSize",
+    value: function updatePageSize(pageSize) {
+      if (pageSize !== this.state.pageSize) {
+        this.loadFromServer(pageSize);
+      }
+    }
+  }, {
     key: "render",
     value: function render() {
-      return React.createElement(ListEntries, {
-        listEntry: this.state.listEntry
-      });
+      return React.createElement("div", null, React.createElement(CreateDialog, {
+        attributes: this.state.attributes,
+        onCreate: this.onCreate
+      }), React.createElement(EntryList, {
+        listEntries: this.state.listEntries,
+        links: this.state.links,
+        pageSize: this.state.pageSize,
+        onNavigate: this.onNavigate,
+        onDelete: this.onDelete,
+        onUpdate: this.onUpdate,
+        updatePageSize: this.updatePageSize,
+        attributes: this.state.attributes
+      }));
     }
   }]);
 
   return App;
 }(React.Component);
 
-var ListEntries =
+var EntryList =
 /*#__PURE__*/
 function (_React$Component2) {
-  _inherits(ListEntries, _React$Component2);
+  _inherits(EntryList, _React$Component2);
 
-  function ListEntries() {
-    _classCallCheck(this, ListEntries);
+  function EntryList(props) {
+    var _this7;
 
-    return _possibleConstructorReturn(this, _getPrototypeOf(ListEntries).apply(this, arguments));
+    _classCallCheck(this, EntryList);
+
+    _this7 = _possibleConstructorReturn(this, _getPrototypeOf(EntryList).call(this, props));
+    _this7.handleNavFirst = _this7.handleNavFirst.bind(_assertThisInitialized(_assertThisInitialized(_this7)));
+    _this7.handleNavPrev = _this7.handleNavPrev.bind(_assertThisInitialized(_assertThisInitialized(_this7)));
+    _this7.handleNavNext = _this7.handleNavNext.bind(_assertThisInitialized(_assertThisInitialized(_this7)));
+    _this7.handleNavLast = _this7.handleNavLast.bind(_assertThisInitialized(_assertThisInitialized(_this7)));
+    _this7.handleInput = _this7.handleInput.bind(_assertThisInitialized(_assertThisInitialized(_this7)));
+    return _this7;
   }
 
-  _createClass(ListEntries, [{
+  _createClass(EntryList, [{
+    key: "handleInput",
+    value: function handleInput(e) {
+      e.preventDefault();
+      var pageSize = ReactDOM.findDOMNode(this.refs.pageSize).value;
+
+      if (/^[0-9]+$/.test(pageSize)) {
+        this.props.updatePageSize(pageSize);
+      } else {
+        ReactDOM.findDOMNode(this.refs.pageSize).value = pageSize.substring(0, pageSize.length - 1);
+      }
+    }
+  }, {
+    key: "handleNavFirst",
+    value: function handleNavFirst(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.first.href);
+    }
+  }, {
+    key: "handleNavPrev",
+    value: function handleNavPrev(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.prev.href);
+    }
+  }, {
+    key: "handleNavNext",
+    value: function handleNavNext(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.next.href);
+    }
+  }, {
+    key: "handleNavLast",
+    value: function handleNavLast(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.last.href);
+    }
+  }, {
     key: "render",
     value: function render() {
-      var listEntry = this.props.listEntry.map(function (listEntry) {
-        return React.createElement("listEntry", {
-          key: listEntry._links.self.href,
-          employee: listEntry
+      var _this8 = this;
+
+      var listEntries = this.props.listEntries.map(function (listEntry) {
+        return React.createElement(ListEntry, {
+          key: listEntry.entity._links.self.href,
+          listEntry: listEntry,
+          attributes: _this8.props.attributes,
+          onDelete: _this8.props.onDelete,
+          onUpdate: _this8.props.onUpdate
         });
       });
-      return React.createElement("table", null, React.createElement("tbody", null, React.createElement("tr", null, React.createElement("th", null, "What to do"), React.createElement("th", null, "is fulfilled")), listEntry));
+      var navLinks = []; //  console.log(this.props);
+
+      if ("first" in this.props.links) {
+        navLinks.push(React.createElement("button", {
+          key: "first",
+          onClick: this.handleNavFirst
+        }, "<<"));
+      }
+
+      if ("prev" in this.props.links) {
+        navLinks.push(React.createElement("button", {
+          key: "prev",
+          onClick: this.handleNavPrev
+        }, "<"));
+      }
+
+      if ("next" in this.props.links) {
+        navLinks.push(React.createElement("button", {
+          key: "next",
+          onClick: this.handleNavNext
+        }, ">"));
+      }
+
+      if ("last" in this.props.links) {
+        navLinks.push(React.createElement("button", {
+          key: "last",
+          onClick: this.handleNavLast
+        }, ">>"));
+      }
+
+      return React.createElement("div", null, React.createElement("input", {
+        ref: "pageSize",
+        defaultValue: this.props.pageSize,
+        onInput: this.handleInput
+      }), React.createElement("table", null, React.createElement("tbody", null, React.createElement("tr", null, React.createElement("th", null, "What to do"), React.createElement("th", null, "is fulfilled")), listEntries)), React.createElement("div", null, navLinks));
     }
   }]);
 
-  return ListEntries;
+  return EntryList;
 }(React.Component);
 
 var ListEntry =
@@ -26866,20 +27081,253 @@ var ListEntry =
 function (_React$Component3) {
   _inherits(ListEntry, _React$Component3);
 
-  function ListEntry() {
+  function ListEntry(props) {
+    var _this9;
+
     _classCallCheck(this, ListEntry);
 
-    return _possibleConstructorReturn(this, _getPrototypeOf(ListEntry).apply(this, arguments));
+    _this9 = _possibleConstructorReturn(this, _getPrototypeOf(ListEntry).call(this, props));
+    _this9.handleDelete = _this9.handleDelete.bind(_assertThisInitialized(_assertThisInitialized(_this9)));
+    return _this9;
   }
 
   _createClass(ListEntry, [{
+    key: "handleDelete",
+    value: function handleDelete() {
+      this.props.onDelete(this.props.listEntry);
+    }
+  }, {
     key: "render",
     value: function render() {
-      return React.createElement("tr", null, React.createElement("td", null, this.props.listEntry.listItem), React.createElement("td", null, this.props.listEntry.isFulfilled));
+      return React.createElement("tr", null, React.createElement("td", null, this.props.listEntry.listItem), React.createElement("td", null, this.props.listEntry.fulfilled.toString()), React.createElement("td", null, React.createElement(UpdateDialog, {
+        listEntry: this.props.listEntry,
+        attributes: this.props.attributes,
+        onUpdate: this.props.onUpdate
+      })), React.createElement("td", null, React.createElement("button", {
+        onClick: this.handleDelete
+      }, "Delete")));
     }
   }]);
 
   return ListEntry;
+}(React.Component);
+
+var CreateDialog =
+/*#__PURE__*/
+function (_React$Component4) {
+  _inherits(CreateDialog, _React$Component4);
+
+  function CreateDialog(props) {
+    var _this10;
+
+    _classCallCheck(this, CreateDialog);
+
+    _this10 = _possibleConstructorReturn(this, _getPrototypeOf(CreateDialog).call(this, props));
+    _this10.handleSubmit = _this10.handleSubmit.bind(_assertThisInitialized(_assertThisInitialized(_this10)));
+    return _this10;
+  }
+
+  _createClass(CreateDialog, [{
+    key: "handleSubmit",
+    value: function handleSubmit(e) {
+      var _this11 = this;
+
+      e.preventDefault();
+      var newListEntry = {};
+      this.props.attributes.forEach(function (attribute) {
+        newListEntry[attribute] = ReactDOM.findDOMNode(_this11.refs[attribute]).value.trim();
+      });
+      this.props.onCreate(newListEntry);
+      this.props.attributes.forEach(function (attribute) {
+        ReactDOM.findDOMNode(_this11.refs[attribute]).value = '';
+      });
+      window.location = "#";
+    }
+  }, {
+    key: "onCreate",
+    value: function onCreate(newListEntry) {
+      var _this12 = this;
+
+      follow(client, root, ['listEntry']).then(function (listEntries) {
+        return client({
+          method: 'POST',
+          path: listEntries.entity._links.self.href,
+          entity: newListEntry,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      }).then(function (response) {
+        return follow(client, root, [{
+          rel: 'listEntries',
+          params: {
+            'size': _this12.state.pageSize
+          }
+        }]);
+      }).done(function (response) {
+        if (typeof response.entity._links.last !== "undefined") {
+          _this12.onNavigation(response.entity._links.last.href);
+        } else {
+          _this12.onNavigation(response.entity._links.self.href);
+        }
+      });
+    }
+  }, {
+    key: "onNavigation",
+    value: function onNavigation(navUri) {
+      var _this13 = this;
+
+      client({
+        method: 'GET',
+        path: navUri
+      }).done(function (listEntries) {
+        _this13.setState({
+          listEntries: listEntries.entity._embedded.listEntries,
+          attributes: _this13.state.attributes,
+          pageSize: _this13.state.pageSize,
+          links: listEntries.entity._links
+        });
+      });
+    }
+  }, {
+    key: "handleNavFirst",
+    value: function handleNavFirst(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.first.href);
+    }
+  }, {
+    key: "handleNavPrev",
+    value: function handleNavPrev(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.prev.href);
+    }
+  }, {
+    key: "handleNavNext",
+    value: function handleNavNext(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.next.href);
+    }
+  }, {
+    key: "handleNavLast",
+    value: function handleNavLast(e) {
+      e.preventDefault();
+      this.props.onNavigate(this.props.links.last.href);
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      var inputs = this.props.attributes.map(function (attribute) {
+        return React.createElement("p", {
+          key: attribute
+        }, React.createElement("input", {
+          type: "text",
+          placeholder: attribute,
+          ref: attribute,
+          className: "field"
+        }));
+      });
+      return React.createElement("div", null, React.createElement("a", {
+        href: "#createListEntry"
+      }, "Create"), React.createElement("div", {
+        id: "createListEntry",
+        className: "modalDialog"
+      }, React.createElement("div", null, React.createElement("a", {
+        href: "#",
+        title: "Close",
+        className: "close"
+      }, "X"), React.createElement("h2", null, "Create new list entry"), React.createElement("form", null, inputs, React.createElement("button", {
+        onClick: this.handleSubmit
+      }, "Create")))));
+    }
+  }]);
+
+  return CreateDialog;
+}(React.Component);
+
+var UpdateDialog =
+/*#__PURE__*/
+function (_React$Component5) {
+  _inherits(UpdateDialog, _React$Component5);
+
+  function UpdateDialog(props) {
+    var _this14;
+
+    _classCallCheck(this, UpdateDialog);
+
+    _this14 = _possibleConstructorReturn(this, _getPrototypeOf(UpdateDialog).call(this, props));
+    _this14.handleSubmit = _this14.handleSubmit.bind(_assertThisInitialized(_assertThisInitialized(_this14)));
+    return _this14;
+  }
+
+  _createClass(UpdateDialog, [{
+    key: "handleSubmit",
+    value: function handleSubmit(e) {
+      var _this15 = this;
+
+      e.preventDefault();
+      var updateListEntry = {};
+      this.props.attributes.forEach(function (attribute) {
+        updateListEntry[attribute] = ReactDOM.findDOMNode(_this15.refs[attribute]).value.trim();
+      });
+      this.props.onUpdate(this.props.listEntry, updateListEntry);
+      window.location = "#";
+    }
+  }, {
+    key: "onUpdate",
+    value: function onUpdate(listEntry, updatedListEntry) {
+      var _this16 = this;
+
+      client({
+        method: 'PUT',
+        path: listEntry.entity._links.self.href,
+        entity: updatedListEntry,
+        headers: {
+          'Content-Type': 'application/json',
+          'If-Match': listEntry.headers.Etag
+        }
+      }).done(function (response) {
+        _this16.loadFromServer(_this16.state.pageSize);
+      }, function (response) {
+        if (response.status.code === 412) {
+          alert('Denied: Unable to update' + listEntry.entity._links.self.href + '. Your copy is stale.');
+        }
+      });
+    }
+  }, {
+    key: "render",
+    value: function render() {
+      var _this17 = this;
+
+      var inputs = this.props.attributes.map(function (attribute) {
+        return React.createElement("p", {
+          key: _this17.props.listEntry.entity[attribute]
+        }, React.createElement("input", {
+          type: "text",
+          placeholder: attribute,
+          defaultValue: _this17.props.listEntry.entity[attribute],
+          ref: attribute,
+          className: "field"
+        }));
+      });
+      var dialogId = "updateListEntry-" + this.props.listEntry.entity._links.self.href;
+      return React.createElement("div", {
+        key: this.props.listEntry.entity._links.self.href
+      }, React.createElement("a", {
+        href: "#" + dialogId
+      }, " Update "), React.createElement("div", {
+        id: dialogId,
+        className: "modalDialog"
+      }, React.createElement("div", null, React.createElement("a", {
+        href: "#",
+        title: "Close",
+        className: "close"
+      }, "X"), React.createElement("h2", null, "Update an employee"), React.createElement("form", null, inputs, React.createElement("button", {
+        onClick: this.handleSubmit
+      }, " Update ")))));
+    }
+  }]);
+
+  return UpdateDialog;
 }(React.Component);
 
 ReactDOM.render(React.createElement(App, null), document.getElementById('react'));
@@ -26918,6 +27366,55 @@ module.exports = rest.wrap(mime, {
     'Accept': 'application/hal+json'
   }
 });
+
+/***/ }),
+
+/***/ "./src/main/js/follow.js":
+/*!*******************************!*\
+  !*** ./src/main/js/follow.js ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+module.exports = function follow(api, rootPath, relArray) {
+  var root = api({
+    method: 'GET',
+    path: rootPath
+  });
+  return relArray.reduce(function (root, arrayItem) {
+    var rel = typeof arrayItem === 'string' ? arrayItem : arrayItem.rel;
+    return traverseNext(root, rel, arrayItem);
+  }, root);
+
+  function traverseNext(root, rel, arrayItem) {
+    return root.then(function (response) {
+      if (hasEmbeddedRel(response.entity, rel)) {
+        return response.entity._embedded[rel];
+      }
+
+      if (!response.entity._links) {
+        return [];
+      }
+
+      if (typeof arrayItem === 'string') {
+        return api({
+          method: 'GET',
+          path: response.entity._links[rel].href
+        });
+      } else {
+        return api({
+          method: 'GET',
+          path: response.entity._links[rel].href,
+          params: arrayItem.params
+        });
+      }
+    });
+  }
+
+  function hasEmbeddedRel(entity, rel) {
+    return entity._embedded && entity._embedded.hasOwnProperty(rel);
+  }
+};
 
 /***/ }),
 
